@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: powder-dosing-tracker
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: HOST
+        value: 0.0.0.0
