@@ -9,3 +9,4 @@ tunnel.log
 natapp.exe
 config.ini
 natapp.log
+cloudflared.exe
