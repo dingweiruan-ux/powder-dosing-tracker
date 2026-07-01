@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>粉末加样异常追踪系统 — Powder Dosing Anomaly Tracker</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f4f5f9; --surface: #fff; --border: #dde0e7; --text: #1e293b;
+  --muted: #64748b; --accent: #2563eb; --accent-bg: #eff4ff;
+  --red-bg: #fef2f2; --red-border: #fca5a5;
+  --green: #16a34a;
+  --radius: 6px; --shadow: 0 1px 3px rgba(0,0,0,.06);
+  font-size: 14px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+               'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh;
+}
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────── */
+.sidebar {
+  width: 380px; min-width: 380px; background: var(--surface);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  box-shadow: var(--shadow); z-index: 10; overflow-y: auto;
+}
+.sidebar-header {
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, #1e3a5f, #2563eb); color: #fff;
+}
+.sidebar-header h2 { font-size: 1.05rem; font-weight: 700; }
+.sidebar-header .ws-status { font-size: 0.7rem; opacity: .85; margin-top: 2px; }
+.sidebar-header .ws-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
+.sidebar-header .ws-dot.on  { background: #4ade80; }
+.sidebar-header .ws-dot.off { background: #fca5a5; }
+
+.form-body { padding: 14px 20px; flex: 1; overflow-y: auto; }
+
+.repeat-last {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  padding: 9px 12px; border-radius: var(--radius);
+  background: #f0fdf6; border: 1px solid #86efac;
+}
+.repeat-last .info { font-size: 0.7rem; color: #166534; flex: 1; line-height: 1.4; }
+.repeat-last .info strong { font-weight: 700; }
+.btn-repeat {
+  padding: 6px 12px; font-size: 0.75rem; font-weight: 700; white-space: nowrap;
+  background: #16a34a; color: #fff; border: none; border-radius: var(--radius); cursor: pointer;
+}
+.btn-repeat:hover { background: #15803d; }
+
+.form-group { margin-bottom: 10px; }
+.form-group label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--muted); margin-bottom: 3px; }
+.form-group label .unit { font-weight: 400; color: #94a3b8; }
+.form-row { display: flex; gap: 8px; }
+.form-row .form-group { flex: 1; }
+
+input, select {
+  width: 100%; padding: 7px 10px; border: 1px solid var(--border);
+  border-radius: var(--radius); font-size: 0.83rem; font-family: inherit;
+  background: #f8f9fc; color: var(--text); outline: none; transition: .15s;
+}
+input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); background: #fff; }
+input.required { border-left: 3px solid var(--accent); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 8px 16px; border: none; border-radius: var(--radius);
+  font-size: 0.83rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: .15s;
+}
+.btn-primary { background: var(--accent); color: #fff; width: 100%; padding: 9px; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+.btn-secondary { background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: #e2e8f0; }
+.btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.btn-danger:hover { background: #fee2e2; }
+.btn-row { display: flex; gap: 6px; margin-top: 14px; }
+.divider { border-top: 1px solid var(--border); margin: 14px 0; }
+
+/* ── Main / Table ────────────────────────────────────────────────────── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.toolbar label { font-size: 0.76rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.toolbar input[type="text"] { width: 170px; }
+.toolbar input[type="number"] { width: 65px; text-align: center; }
+.toolbar .spacer { flex: 1; }
+.record-badge {
+  font-size: 0.76rem; color: var(--muted); font-weight: 600;
+  background: #f1f5f9; padding: 3px 10px; border-radius: 12px;
+}
+
+.table-wrap { flex: 1; overflow: auto; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 0.78rem; white-space: nowrap; }
+thead { position: sticky; top: 0; z-index: 3; }
+thead th {
+  background: #f1f5f9; border-bottom: 2px solid var(--border); padding: 9px 10px;
+  text-align: left; font-weight: 700; font-size: 0.71rem; text-transform: uppercase;
+  letter-spacing: .02em; color: var(--muted); cursor: pointer; user-select: none;
+}
+thead th:hover { background: #e2e8f0; }
+thead th.sorted { color: var(--accent); background: var(--accent-bg); }
+thead th .arrow { margin-left: 2px; font-size: 0.62rem; }
+thead th.num, td.num { text-align: right; }
+thead th.ts, td.ts { font-family: 'SF Mono','Fira Code','Consolas',monospace; font-size: 0.74rem; }
+
+tbody td { padding: 7px 10px; border-bottom: 1px solid #f1f4f8; }
+tbody tr:hover { background: #f8fafd; }
+
+tr.exceeded { background: var(--red-bg) !important; }
+tr.exceeded:hover { background: #fee2e2 !important; }
+tr.exceeded td { border-bottom-color: var(--red-border); }
+tr.exceeded td:first-child { border-left: 3px solid #dc2626; }
+
+@keyframes flash { from { background: #dbeafe; } to { background: transparent; } }
+tr.flash { animation: flash 1.2s ease-out; }
+tr.flash.exceeded { animation: flash-red 1.2s ease-out; }
+@keyframes flash-red { from { background: #fca5a5; } to { background: var(--red-bg); } }
+
+td.actions { text-align: center; }
+.btn-sm {
+  padding: 2px 9px; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--border);
+  background: #fff; cursor: pointer; color: var(--muted);
+}
+.btn-sm:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+
+.empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty .icon { font-size: 3rem; margin-bottom: 10px; }
+.empty p { font-size: 0.9rem; }
+
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 999;
+  padding: 10px 20px; border-radius: var(--radius); font-weight: 600; font-size: 0.83rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15); transition: .3s; opacity: 0; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+.toast.success { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
+.toast.error { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+.toast.info { background: #eff4ff; color: #1e40af; border: 1px solid #93c5fd; }
+
+@media (max-width: 900px) {
+  .app { flex-direction: column; }
+  .sidebar { width: 100%; min-width: 100%; max-height: 55vh; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+     LEFT PANEL — Entry Form
+     ════════════════════════════════════════════════════════════════════ -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>📝 手动录入 Manual Entry</h2>
+      <div class="ws-status">
+        <span class="ws-dot off" id="ws-dot"></span>
+        <span id="ws-text">Connecting…</span>
+      </div>
+    </div>
+
+    <div class="form-body">
+      <div class="repeat-last" id="repeat-box" style="display:none">
+        <div class="info" id="repeat-info"></div>
+        <button class="btn-repeat" onclick="repeatLast()">🔄 套用上次<br>Repeat</button>
+      </div>
+
+      <div class="form-group">
+        <label>🔴 原料名称 Material Name</label>
+        <input type="text" id="f-material" class="required" placeholder="e.g. Co-Li/AC Catalyst" autocomplete="off">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>连续加样转速 <span class="unit">(rpm)</span></label>
+          <input type="number" id="f-cont-speed" step="any" placeholder="150.5">
+        </div>
+        <div class="form-group">
+          <label>点动加样重量 <span class="unit">(g)</span></label>
+          <input type="number" id="f-inch-weight" step="any" placeholder="2.30">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>点动加样角度 <span class="unit">(°)</span></label>
+          <input type="number" id="f-inch-angle" step="any" placeholder="45.0">
+        </div>
+        <div class="form-group">
+          <label>点动加样转速 <span class="unit">(rpm)</span></label>
+          <input type="number" id="f-inch-speed" step="any" placeholder="120.0">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>🔴 目标加样重量 Target <span class="unit">(g)</span></label>
+          <input type="number" id="f-target" class="required" step="any" placeholder="100.00">
+        </div>
+        <div class="form-group">
+          <label>🔴 实际加样重量 Actual <span class="unit">(g)</span></label>
+          <input type="number" id="f-actual" class="required" step="any" placeholder="103.50">
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btn-submit" onclick="addRecord()">
+        ➕ 添加记录 Add Record
+      </button>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" style="flex:1" onclick="clearForm()">🗑 清空表单</button>
+        <button class="btn btn-danger" style="flex:1" onclick="clearAllData()">⚠ 清空全部</button>
+      </div>
+
+      <div class="divider"></div>
+      <div style="font-size:0.7rem;color:var(--muted);text-align:center;">
+        💡 服务端存储 · 多端实时同步<br>
+        Ctrl+Enter 快捷提交
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+     RIGHT PANEL — Data Table
+     ════════════════════════════════════════════════════════════════════ -->
+  <div class="main">
+    <div class="toolbar">
+      <label>🔍 原料筛选:</label>
+      <input type="text" id="filter-material" placeholder="Filter…" oninput="onFilterChange()">
+
+      <label>🎯 误差容限 (%):</label>
+      <input type="number" id="filter-tolerance" value="5" min="0" max="100" step="0.1" oninput="renderTable()">
+
+      <div class="spacer"></div>
+
+      <span class="record-badge" id="record-badge">Records: 0</span>
+
+      <button class="btn btn-secondary" style="font-size:0.72rem" onclick="exportCSV()">📥 Export CSV</button>
+      <button class="btn btn-secondary" style="font-size:0.72rem" onclick="importCSV()">📤 Import CSV</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-col="id" style="width:40px">#</th>
+            <th data-col="material_name" style="min-width:145px">原料名称 Material</th>
+            <th data-col="continuous_dosing_speed" class="num">连续加样转速<br>Speed (rpm)</th>
+            <th data-col="inching_dosing_weight" class="num">点动加样重量<br>Inch Wt (g)</th>
+            <th data-col="inching_dosing_angle" class="num">点动加样角度<br>Inch Ang (°)</th>
+            <th data-col="inching_dosing_speed" class="num">点动加样转速<br>Inch Spd (rpm)</th>
+            <th data-col="target_dosing_weight" class="num">目标加样重量<br>Target (g)</th>
+            <th data-col="actual_dosing_weight" class="num">实际加样重量<br>Actual (g)</th>
+            <th data-col="error_value" class="num">误差值<br>Error (mg)</th>
+            <th data-col="server_timestamp" class="ts sorted" style="min-width:170px">系统写入时间 ▼<br>System Time</th>
+            <th style="width:50px;text-align:center">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════════════════ */
+let records = [];
+let sortCol = 'server_timestamp';
+let sortDir = 'DESC';
+let newRowId = null;
+let ws = null;
+let wsReconnectTimer = null;
+
+/* ═══════════════════════════════════════════════════════════════════════
+   WEBSOCKET
+   ═══════════════════════════════════════════════════════════════════════ */
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  try { ws = new WebSocket(proto + '//' + location.host + '/ws'); }
+  catch { scheduleReconnect(); return; }
+
+  ws.onopen = () => {
+    document.getElementById('ws-dot').className = 'ws-dot on';
+    document.getElementById('ws-text').textContent = '已连接 · 实时同步中';
+    if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'new_log') {
+        // Dedup
+        if (records.some(r => r.id === msg.data.id)) return;
+        records.unshift(msg.data);
+        newRowId = msg.data.id;
+        renderTable();
+        updateRepeatBox();
+      }
+    } catch {}
+  };
+
+  ws.onclose = () => {
+    document.getElementById('ws-dot').className = 'ws-dot off';
+    document.getElementById('ws-text').textContent = '未连接 · 无法实时同步';
+    ws = null;
+    scheduleReconnect();
+  };
+
+  ws.onerror = () => {};
+}
+
+function scheduleReconnect() {
+  if (wsReconnectTimer) return;
+  wsReconnectTimer = setTimeout(() => { wsReconnectTimer = null; connectWS(); }, 3000);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DATA FETCH
+   ═══════════════════════════════════════════════════════════════════════ */
+async function fetchLogs() {
+  try {
+    const params = new URLSearchParams({ sort_by: sortCol, sort_order: sortDir, limit: '5000' });
+    const filter = document.getElementById('filter-material').value.trim();
+    if (filter) params.set('material_name', filter);
+
+    const res = await fetch('/api/logs?' + params);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    records = data.records;
+    renderTable();
+    updateRepeatBox();
+  } catch (err) {
+    console.error('[Fetch]', err);
+    if (records.length === 0) {
+      document.getElementById('tb').innerHTML = `<tr class="empty"><td colspan="11">
+        <div class="icon">⚠️</div><p>无法连接服务器，请确认服务已启动</p></td></tr>`;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ADD RECORD
+   ═══════════════════════════════════════════════════════════════════════ */
+async function addRecord() {
+  const material = document.getElementById('f-material').value.trim();
+  const target = parseFloat(document.getElementById('f-target').value);
+  const actual = parseFloat(document.getElementById('f-actual').value);
+
+  if (!material) { toast('请输入原料名称', 'error'); return; }
+  if (isNaN(target)) { toast('请输入目标加样重量', 'error'); return; }
+  if (isNaN(actual)) { toast('请输入实际加样重量', 'error'); return; }
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.textContent = '提交中…';
+
+  const payload = {
+    material_name: material,
+    continuous_dosing_speed: parseOrNull('f-cont-speed'),
+    inching_dosing_weight:   parseOrNull('f-inch-weight'),
+    inching_dosing_angle:    parseOrNull('f-inch-angle'),
+    inching_dosing_speed:    parseOrNull('f-inch-speed'),
+    target_dosing_weight: target,
+    actual_dosing_weight: actual,
+  };
+
+  try {
+    const res = await fetch('/api/logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'HTTP ' + res.status);
+    }
+    const data = await res.json();
+    records.unshift(data.record);
+    newRowId = data.record.id;
+
+    // Only clear actual weight — keep rest for quick tweaks
+    document.getElementById('f-actual').value = '';
+    document.getElementById('f-actual').focus();
+    renderTable();
+    updateRepeatBox();
+    toast(`✅ 记录 #${data.record.id} — ${material} | 误差: ${data.record.error_value} mg`, 'success');
+  } catch (err) {
+    toast('添加失败: ' + err.message, 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '➕ 添加记录 Add Record';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DELETE / CLEAR
+   ═══════════════════════════════════════════════════════════════════════ */
+async function deleteRecord(id) {
+  if (!confirm('确认删除记录 #' + id + '？')) return;
+  // Server doesn't have DELETE endpoint, so we just filter client-side.
+  // In production, add DELETE /api/logs/:id
+  records = records.filter(r => r.id !== id);
+  renderTable();
+  updateRepeatBox();
+  toast('🗑 记录 #' + id + ' 已删除（需刷新同步到服务端）', 'info');
+}
+
+function clearAllData() {
+  if (!confirm('⚠️ 确认清空全部数据？此操作不可撤销！\n\n建议先导出 CSV 备份。')) return;
+  records = [];
+  renderTable();
+  updateRepeatBox();
+  toast('⚠️ 仅清空本地显示，刷新页面后数据会重新从服务端加载', 'info');
+}
+
+function clearForm() {
+  ['f-material','f-cont-speed','f-inch-weight','f-inch-angle','f-inch-speed',
+   'f-target','f-actual'].forEach(id => document.getElementById(id).value = '');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   REPEAT LAST
+   ═══════════════════════════════════════════════════════════════════════ */
+function repeatLast() {
+  if (records.length === 0) { toast('暂无历史记录', 'error'); return; }
+  const last = records[0];
+  document.getElementById('f-material').value   = last.material_name;
+  document.getElementById('f-cont-speed').value  = last.continuous_dosing_speed ?? '';
+  document.getElementById('f-inch-weight').value = last.inching_dosing_weight ?? '';
+  document.getElementById('f-inch-angle').value  = last.inching_dosing_angle ?? '';
+  document.getElementById('f-inch-speed').value  = last.inching_dosing_speed ?? '';
+  document.getElementById('f-target').value      = last.target_dosing_weight;
+  document.getElementById('f-actual').value      = '';
+  document.getElementById('f-actual').focus();
+  toast('📋 已套用上次参数，请输入新的实际重量', 'success');
+}
+
+function updateRepeatBox() {
+  const box = document.getElementById('repeat-box');
+  const info = document.getElementById('repeat-info');
+  if (records.length === 0) { box.style.display = 'none'; return; }
+  const last = records[0];
+  const err = last.error_value;
+  const sign = err >= 0 ? '+' : '';
+  box.style.display = 'flex';
+  info.innerHTML = `上次: <strong>${esc(last.material_name)}</strong><br>`
+    + `Target ${last.target_dosing_weight?.toFixed(2)}g → `
+    + `误差 <span style="color:${err<0?'#dc2626':'#16a34a'};font-weight:700">${sign}${err} mg</span>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER TABLE
+   ═══════════════════════════════════════════════════════════════════════ */
+function renderTable() {
+  const tol = parseFloat(document.getElementById('filter-tolerance').value) || 5;
+  const materialFilter = document.getElementById('filter-material').value.trim().toLowerCase();
+
+  let filtered = records;
+  if (materialFilter) {
+    filtered = records.filter(r => r.material_name.toLowerCase().includes(materialFilter));
+  }
+
+  filtered = [...filtered].sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === 'number' && typeof vb === 'number')
+      return sortDir === 'ASC' ? va - vb : vb - va;
+    return sortDir === 'ASC'
+      ? String(va).localeCompare(String(vb), 'zh-CN')
+      : String(vb).localeCompare(String(va), 'zh-CN');
+  });
+
+  document.getElementById('record-badge').textContent = 'Records: ' + filtered.length;
+
+  const tb = document.getElementById('tb');
+  if (filtered.length === 0) {
+    tb.innerHTML = `<tr class="empty"><td colspan="11">
+      <div class="icon">📭</div>
+      <p>${records.length === 0 ? '暂无数据，在左侧表单添加记录' : '没有匹配的筛选结果'}</p>
+    </td></tr>`;
+    return;
+  }
+
+  tb.innerHTML = filtered.map(r => {
+    const errPct = r.target_dosing_weight !== 0
+      ? Math.abs(r.error_value) / (r.target_dosing_weight * 1000) * 100 : 0;
+    const exceeded = errPct > tol;
+    const flash = r.id === newRowId ? ' flash' : '';
+    const errColor = r.error_value < 0 ? '#dc2626' : r.error_value > 0 ? '#16a34a' : 'inherit';
+    return `<tr class="${(exceeded ? 'exceeded' : '') + flash}">
+      <td>${r.id}</td>
+      <td><strong>${esc(r.material_name)}</strong></td>
+      <td class="num">${fmt(r.continuous_dosing_speed)}</td>
+      <td class="num">${fmt(r.inching_dosing_weight)}</td>
+      <td class="num">${fmt(r.inching_dosing_angle)}</td>
+      <td class="num">${fmt(r.inching_dosing_speed)}</td>
+      <td class="num">${fmt(r.target_dosing_weight)}</td>
+      <td class="num">${fmt(r.actual_dosing_weight)}</td>
+      <td class="num" style="font-weight:600;color:${errColor}">${fmtSigned(r.error_value)}</td>
+      <td class="ts">${fmtTs(r.server_timestamp)}</td>
+      <td class="actions"><button class="btn-sm" onclick="deleteRecord(${r.id})">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  if (newRowId) setTimeout(() => { newRowId = null; renderTable(); }, 1300);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SORTING
+   ═══════════════════════════════════════════════════════════════════════ */
+document.querySelector('thead').addEventListener('click', e => {
+  const th = e.target.closest('th[data-col]');
+  if (!th) return;
+  const col = th.dataset.col;
+  sortDir = (sortCol === col && sortDir === 'ASC') ? 'DESC' : 'ASC';
+  sortCol = col;
+
+  document.querySelectorAll('thead th').forEach(h => {
+    h.classList.remove('sorted'); h.querySelector('.arrow')?.remove();
+  });
+  th.classList.add('sorted');
+  const arrow = document.createElement('span');
+  arrow.className = 'arrow';
+  arrow.textContent = sortDir === 'ASC' ? '▲' : '▼';
+  th.appendChild(arrow);
+
+  fetchLogs(); // server-side sort
+});
+
+let filterTimer;
+function onFilterChange() {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(fetchLogs, 300);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CSV EXPORT / IMPORT
+   ═══════════════════════════════════════════════════════════════════════ */
+function exportCSV() {
+  if (records.length === 0) { toast('没有数据可导出', 'error'); return; }
+  const headers = [
+    'id','material_name','continuous_dosing_speed','inching_dosing_weight',
+    'inching_dosing_angle','inching_dosing_speed','target_dosing_weight',
+    'actual_dosing_weight','error_value','server_timestamp'
+  ];
+  const rows = [headers.join(',')];
+  for (const r of records) {
+    rows.push(headers.map(h => {
+      const v = r[h];
+      if (v == null) return '';
+      if (typeof v === 'string' && (v.includes(',') || v.includes('"'))) return '"' + v.replace(/"/g,'""') + '"';
+      return String(v);
+    }).join(','));
+  }
+  const blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'powder_dosing_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('📥 导出 ' + records.length + ' 条记录', 'success');
+}
+
+function importCSV() { document.getElementById('csv-file-input').click(); }
+
+function handleCSVImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const lines = e.target.result.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { toast('CSV 文件为空', 'error'); return; }
+      const headers = lines[0].split(',');
+      const imported = [];
+      for (let i = 1; i < lines.length; i++) {
+        const vals = parseCSVLine(lines[i]);
+        if (vals.length < headers.length) continue;
+        const row = {};
+        headers.forEach((h, idx) => {
+          const v = vals[idx]?.trim();
+          if (v === '' || v == null) { row[h] = null; return; }
+          const numCols = ['continuous_dosing_speed','inching_dosing_weight',
+            'inching_dosing_angle','inching_dosing_speed','target_dosing_weight',
+            'actual_dosing_weight','error_value','id'];
+          if (numCols.includes(h)) row[h] = parseFloat(v);
+          else row[h] = v;
+        });
+        imported.push(row);
+      }
+      if (imported.length === 0) { toast('CSV 中无有效数据', 'error'); return; }
+
+      let count = 0;
+      for (const r of imported) {
+        try {
+          await fetch('/api/logs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...r, id: undefined }),
+          });
+          count++;
+        } catch {}
+      }
+      await fetchLogs();
+      toast('📤 成功导入 ' + count + ' 条记录', 'success');
+    } catch (err) {
+      toast('CSV 解析失败: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+  event.target.value = '';
+}
+
+function parseCSVLine(line) {
+  const result = []; let cur = '', inQ = false;
+  for (const ch of line) {
+    if (inQ) { if (ch === '"') inQ = false; else cur += ch; }
+    else { if (ch === '"') inQ = true; else if (ch === ',') { result.push(cur); cur = ''; } else cur += ch; }
+  }
+  result.push(cur);
+  return result;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════════ */
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmt(v) { return (v == null || isNaN(v)) ? '—' : Number(v).toFixed(3); }
+function fmtSigned(v) { if (v == null || isNaN(v)) return '—'; const n = Number(v); return (n > 0 ? '+' : '') + n.toFixed(1); }
+function parseOrNull(id) { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v; }
+function fmtTs(ts) {
+  if (!ts) return '—';
+  try { const d = new Date(ts); if (isNaN(d.getTime())) return ts;
+    return d.toLocaleString('zh-CN', { hour12: false, year:'numeric', month:'2-digit',
+      day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  } catch { return ts; }
+}
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type + ' show';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.className = 'toast', 2500);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'Enter') addRecord(); });
+connectWS();
+fetchLogs();
+</script>
+</body>
+</html>

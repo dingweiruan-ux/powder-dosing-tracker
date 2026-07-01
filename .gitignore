@@ -1,0 +1,11 @@
+node_modules/
+anomaly_logs.db
+natapp_output.txt
+natapp.log
+server.log
+tunnel_url.txt
+tunnel.log
+*.zip
+natapp.exe
+config.ini
+natapp.log
