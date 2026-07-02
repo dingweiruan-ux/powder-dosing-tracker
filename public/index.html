@@ -175,7 +175,7 @@ td.actions { text-align: center; }
 
       <div class="form-group">
         <label>🔴 原料名称 Material Name</label>
-        <input type="text" id="f-material" class="required" placeholder="e.g. Co-Li/AC Catalyst" autocomplete="off">
+        <input type="text" id="f-material" class="required" placeholder="输入或选择原料名称…" list="material-list" autocomplete="off">
       </div>
 
       <div class="form-row">
@@ -272,6 +272,62 @@ td.actions { text-align: center; }
 
 <div class="toast" id="toast"></div>
 <input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
+
+<datalist id="material-list">
+<option value="92028 乙酸异丁香酚酯">
+<option value="92153 桂酸桂酯">
+<option value="92229 二氢猕猴桃内酯/奇异果内酯">
+<option value="92247 2-乙酰苯甲酸甲酯">
+<option value="93020 甲基麦芽酚/麦芽酚">
+<option value="93022 乙基麦芽酚">
+<option value="93023 麝香草酚/百里香酚">
+<option value="93025 香豆素">
+<option value="93029 香兰素">
+<option value="93030 乙基香兰素">
+<option value="93032 乙基香兰素（进口）">
+<option value="93035 香兰素（进口）">
+<option value="93037 浓馥香兰素">
+<option value="93046 苄基异丁香酚">
+<option value="93058 乙基麦芽酚（进口）">
+<option value="96027 对叔丁基环己醇">
+<option value="96075 薄荷脑">
+<option value="96076 合成龙脑">
+<option value="96077 合成樟脑">
+<option value="96101 合成龙脑（优级）">
+<option value="96905 乙位萘甲醚">
+<option value="96913 乙位萘乙醚">
+<option value="96931 苯甲酸">
+<option value="97050 藜芦醛">
+<option value="98004 甲基环戊烯醇酮">
+<option value="98021 覆盆子酮">
+<option value="98036 二苯甲酮">
+<option value="98073 甲基萘酮/甜橙晶">
+<option value="98081 胡椒基丙酮">
+<option value="98091 乙位环氧基紫罗兰酮">
+<option value="98503 吲哚(国产)">
+<option value="98504 吲哚(进口)">
+<option value="98514 柏木精脑">
+<option value="98516 天然龙脑">
+<option value="98518 布枯肟">
+<option value="98525 吲哚酚">
+<option value="98527 卡龙/西瓜酮">
+<option value="98531 抗氧化剂">
+<option value="98662 紫外线吸收剂UV531（粉末）">
+<option value="98675 3-甲基吲哚">
+<option value="98686 卡斯卡龙">
+<option value="99009 二甲苯麝香">
+<option value="99010 酮麝香">
+<option value="99011 葵子麝香">
+<option value="99013 萨利麝香">
+<option value="99017 吐纳麝香">
+<option value="99018 合成橡苔">
+<option value="99019 素凝香">
+<option value="99020 结晶玫瑰">
+<option value="99029 龙涎呋喃（GIV）">
+<option value="99030 超级龙涎醚（固体）">
+<option value="99056 降龙涎醚（FIR）">
+<option value="99066 帝王龙涎 (100%)">
+</datalist>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
